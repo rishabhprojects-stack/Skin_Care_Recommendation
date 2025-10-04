@@ -1,0 +1,11 @@
+# Core
+streamlit==1.38.0
+pandas==2.2.2
+requests==2.32.3
+
+# Utils
+python-dotenv==1.0.1   # if you use .env for API keys
+
+# For vizualization
+matplotlib==3.9.2
+plotly==5.24.1

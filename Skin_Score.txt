@@ -1,0 +1,46 @@
+Purpose:
+The skinscore.py module is responsible for analyzing weather data and assigning a “skincare stress score” for each day. This score helps determine how much the user’s skin might be affected by environmental conditions and provides tailored recommendations for daily skincare.
+Function: add_skincare_score(daily_summary, skin_type="normal")
+Inputs:
+daily_summary – a Pandas DataFrame containing daily weather information. Expected columns include:
+avg_humidity → average humidity of the day
+wind_speed → average wind speed
+min_temp → minimum temperature of the day
+total_rain / total_snow → daily precipitation totals
+uvi → ultraviolet index (optional, default 0 if missing)
+skin_type – the user’s skin type (default: "normal"). Can be "dry", "oily", "sensitive", etc. This allows customization of recommendations based on how sensitive a skin type is to certain stresses.
+How it works:
+For each row (i.e., each day) in daily_summary:
+Hydration Stress
+Evaluates how dry or humid the environment is.
+The effect depends on the user’s skin type:
+Dry skin: very sensitive to low humidity → higher score if air is dry.
+Oily skin: less sensitive but still affected by very low humidity.
+Appends a recommendation like: "Low humidity – rich moisturizer essential".
+Sun / UV Stress
+Uses the UV index (uvi) to estimate sun exposure risk.
+Higher UV values increase the score and prompt recommendations like "High UV – SPF 50+ needed".
+Wind Stress
+Checks average wind speed:
+Strong wind → higher skincare stress → recommendation for a barrier cream.
+Moderate wind → smaller effect.
+Cold Stress
+Evaluates minimum temperature:
+Very cold → heavier moisturizer recommended.
+Mildly cool → moderate hydration recommended.
+Rain / Snow Stress
+If total precipitation is high → adds to skincare stress.
+Recommends protective creams for rain or snow.
+Score Calculation
+All stress factors are added together to produce a skincare score for the day (0–100).
+The higher the score, the more the skin might need protection or care.
+Recommendations
+All textual suggestions for the day are combined into a single string and stored in skincare_recs.
+Outputs:
+The function returns the same daily_summary DataFrame with two new columns:
+skincare_score → numeric score indicating overall daily skin stress.
+skincare_recs → human-readable recommendations for the day.
+Use in the application:
+This function is called after weather data is fetched and summarized (via fetch_weather_data + summarize_daily_weather).
+The skincare_score helps the app prioritize which products the user should use today.
+The skincare_recs are displayed to the user as daily skincare guidance, e.g., recommending moisturizers, sunscreens, or barrier creams depending on weather stress.

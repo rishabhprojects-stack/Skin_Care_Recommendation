@@ -1,0 +1,12 @@
+This is just a baseline rule-based model.
+
+Later, we can refine it with machine learning, combining historical weather +
+skincare outcomes (dryness, irritation, acne reports) to train a recommendation model.
+
+need to create a data base with Foreo product list:
+in order to do this, i need to understand what kind of information i can obtain
+about these products, things i would like:
+1. ingredients in products
+2. use cases of products
+3. relationships between ingredients and weather
+4. relationships between type of products and weather
