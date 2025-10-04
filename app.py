@@ -35,7 +35,7 @@ st.title(f"Welcome {user_row['name']}! Your Personalized Skincare Routine")
 st.write(f"**Location:** {user_row['location']}")
 st.write(f"**Skin type:** {user_row['skin_type']}")
 st.write(f"**Concerns:** {', '.join(user_row['skin_concerns'])}")
-st.write(f"**Owned products:** {', '.join(user_row['owned_products'])}")
+st.write(f"**Owned products:** {', '.join(user_row['owned_products']) if user_row['owned_products'] else 'None'}")
 
 # --- Weather & Skin Score ---
 df_weather = fetch_weather_data(user_row["lat"], user_row["lon"])
@@ -43,7 +43,9 @@ daily_summary = summarize_daily_weather(df_weather)
 daily_with_score = add_skincare_score(daily_summary, user_row["skin_type"])
 
 st.subheader("🌤 Weather Summary + Skin Stress")
-st.dataframe(daily_with_score[["date", "min_temp", "max_temp", "avg_humidity", "skincare_score", "skincare_recs"]])
+st.dataframe(
+    daily_with_score[["date", "min_temp", "max_temp", "avg_humidity", "skincare_score", "skincare_recs"]]
+)
 
 # --- Product Recommendations ---
 recs_from_weather, owned_recs, new_recs, routine = recommend_products(user_row, daily_with_score, products_db)
@@ -52,7 +54,10 @@ st.subheader("💡 Recommendations based on today’s conditions")
 
 # Weather-driven needs
 st.markdown("### 🌤 Weather-driven needs")
-st.info(recs_from_weather)
+if recs_from_weather:
+    st.info(recs_from_weather)
+else:
+    st.write("No special weather-driven needs today. Keep your routine consistent!")
 
 # Owned products
 st.markdown("### ✅ Useful from owned products")
@@ -62,7 +67,7 @@ if owned_recs:
         with cols[idx % 4]:
             st.success(p)
 else:
-    st.write("None")
+    st.write("No owned products match today’s needs.")
 
 # New products
 st.markdown("### ✨ Suggested new products")
@@ -72,19 +77,22 @@ if new_recs:
         with cols[idx % 4]:
             st.warning(p)
 else:
-    st.write("None")
+    st.write("No new products needed today!")
 
 # --- Step-by-step AM/PM routines as cards ---
 for time_of_day in ["AM", "PM"]:
     st.subheader(f"🕘 {time_of_day} Routine")
     if routine.get(time_of_day):
         grouped = group_and_sort_products(routine[time_of_day], products_db)
-        for cat, items in grouped.items():
-            with st.container():
-                st.markdown(f"### {cat.capitalize()}")
-                cols = st.columns(min(len(items), 4))  # max 4 per row
-                for idx, p in enumerate(items):
-                    with cols[idx % 4]:
-                        st.info(p)
+        if grouped:
+            for cat, items in grouped.items():
+                with st.container():
+                    st.markdown(f"### {cat.capitalize()}")
+                    cols = st.columns(min(len(items), 4))  # max 4 per row
+                    for idx, p in enumerate(items):
+                        with cols[idx % 4]:
+                            st.info(p)
+        else:
+            st.write("No steps required in this routine.")
     else:
-        st.write("None")
+        st.write("No routine suggested for this time of day.")
