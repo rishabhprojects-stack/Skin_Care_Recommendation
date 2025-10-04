@@ -10,3 +10,6 @@ about these products, things i would like:
 2. use cases of products
 3. relationships between ingredients and weather
 4. relationships between type of products and weather
+
+
+Need more knowledge about the buissness logics that are needed
