@@ -1,126 +1,102 @@
-from collections import OrderedDict
+# product_recommendation.py
 
-# Typical skincare application order
-APPLICATION_ORDER = [
-    "cleanser",
-    "toner",
-    "serum",
-    "hydrator",
-    "moisturizer",
-    "cream",
-    "balm",
-    "mattifier",
-    "sunscreen",
-    "treatment",
-    "other"
-]
+# Mapping rules for product application order
+APPLICATION_ORDER = {
+    # AM essentials
+    "SPF": "AM",
+    "Sunscreen": "AM",
+    "Day Moisturizer": "AM",
+    "Vitamin C": "AM",
 
-def group_and_sort_products(products_list, products_db):
+    # PM essentials
+    "Night Repair": "PM",
+    "Soothing Cream": "PM",
+    "Barrier Protection Balm": "PM",
+    "Retinol": "PM",
+    "Sleeping Mask": "PM",
+
+    # Flexible (defaults to AM if not specified elsewhere)
+    "Moisturizer": "AM",
+}
+
+
+def assign_routine(products):
     """
-    Group products by category and sort categories by APPLICATION_ORDER.
-    Returns OrderedDict of category -> list of products.
+    Assigns products into AM and PM skincare routines.
+    Falls back gracefully if products are not found in APPLICATION_ORDER.
     """
-    grouped = {}
-    for p in products_list:
-        product_row = products_db[products_db["name"] == p]
-        if not product_row.empty:
-            category = product_row.iloc[0]["category"]
-        else:
-            category = "other"
-        grouped.setdefault(category, []).append(p)
 
-    ordered_grouped = OrderedDict()
-    for cat in APPLICATION_ORDER:
-        if cat in grouped:
-            ordered_grouped[cat] = grouped[cat]
-    for cat in grouped:
-        if cat not in ordered_grouped:
-            ordered_grouped[cat] = grouped[cat]
+    am_routine = []
+    pm_routine = []
 
-    return ordered_grouped
+    for product in products:
+        assigned = False
+        for key, slot in APPLICATION_ORDER.items():
+            if key.lower() in product.lower():
+                if slot == "AM":
+                    am_routine.append(product)
+                else:
+                    pm_routine.append(product)
+                assigned = True
+                break
+
+        # fallback if product not explicitly in APPLICATION_ORDER
+        if not assigned:
+            if "cream" in product.lower():
+                pm_routine.append(product)
+            else:
+                am_routine.append(product)
+
+    # ensure routines are never empty
+    if not am_routine:
+        am_routine.append("Gentle Cleanser")
+    if not pm_routine:
+        pm_routine.append("Basic Moisturizer")
+
+    return am_routine, pm_routine
 
 
 def recommend_products(user_row, daily_with_score, products_db):
     """
-    Generate personalized recommendations based on weather, skin type, and concerns,
-    and split into smarter AM/PM routines.
+    Recommend skincare products based on:
+    - User’s skin type and concerns
+    - Weather-driven needs (from skinscore)
+    - Owned products vs new suggestions
     """
-    owned_names = set(user_row["owned_products"])
-    owned_products = products_db[products_db["name"].isin(owned_names)]
 
+    # Take today’s weather-driven needs
     today = daily_with_score.iloc[0]
-    recs_from_weather = today["skincare_recs"].lower()
+    weather_recs = today.get("skincare_recs", "")
 
-    owned_recs = []
-    new_recs = []
+    # Filter useful owned products
+    owned_useful = []
+    for p in user_row["owned_products"]:
+        for keyword in ["SPF", "Moisturizer", "Cream", "Serum", "Balm"]:
+            if keyword.lower() in p.lower() and keyword.lower() in weather_recs.lower():
+                owned_useful.append(p)
 
-    # --- Weather-driven recs ---
-    if "moisturizer" in recs_from_weather or "cream" in recs_from_weather:
-        owned_recs.extend(owned_products[owned_products["category"].isin(["moisturizer", "cream"])]["name"].tolist())
-        new_recs.extend(products_db[(products_db["category"].isin(["moisturizer", "cream"])) & (~products_db["name"].isin(owned_names))]["name"].tolist())
+    # Suggested new products (exclude already owned)
+    suggested_new = [
+        prod for prod in products_db["name"].tolist()
+        if prod not in user_row["owned_products"]
+    ]
 
-    if "spf" in recs_from_weather:
-        owned_recs.extend(owned_products[owned_products["category"] == "sunscreen"]["name"].tolist())
-        new_recs.extend(products_db[(products_db["category"] == "sunscreen") & (~products_db["name"].isin(owned_names))]["name"].tolist())
+    # Build AM/PM routines
+    all_products = owned_useful + suggested_new
+    am_routine, pm_routine = assign_routine(all_products)
 
-    if "serum" in recs_from_weather:
-        owned_recs.extend(owned_products[owned_products["category"] == "serum"]["name"].tolist())
-        new_recs.extend(products_db[(products_db["category"] == "serum") & (~products_db["name"].isin(owned_names))]["name"].tolist())
+    return weather_recs, owned_useful, suggested_new, {"AM": am_routine, "PM": pm_routine}
 
-    if "balm" in recs_from_weather:
-        owned_recs.extend(owned_products[owned_products["category"] == "balm"]["name"].tolist())
-        new_recs.extend(products_db[(products_db["category"] == "balm") & (~products_db["name"].isin(owned_names))]["name"].tolist())
 
-    # --- Skin type baseline needs ---
-    skin_type = user_row["skin_type"].lower()
-    if skin_type == "dry":
-        new_recs.extend(products_db[(products_db["category"].isin(["hydrator", "serum"])) & (~products_db["name"].isin(owned_names))]["name"].tolist())
-    elif skin_type == "oily":
-        new_recs.extend(products_db[(products_db["category"].isin(["gel cleanser", "mattifier"])) & (~products_db["name"].isin(owned_names))]["name"].tolist())
-    elif skin_type == "sensitive":
-        new_recs.extend(products_db[(products_db["category"].isin(["soothing cream", "balm"])) & (~products_db["name"].isin(owned_names))]["name"].tolist())
-
-    # --- Skin concerns targeted boosters ---
-    for concern in user_row["skin_concerns"]:
-        concern = concern.lower()
-        if "acne" in concern:
-            new_recs.extend(products_db[(products_db["category"] == "anti-acne") & (~products_db["name"].isin(owned_names))]["name"].tolist())
-        if "fine lines" in concern or "wrinkles" in concern:
-            new_recs.extend(products_db[(products_db["category"] == "anti-aging") & (~products_db["name"].isin(owned_names))]["name"].tolist())
-        if "dullness" in concern:
-            new_recs.extend(products_db[(products_db["category"] == "brightening") & (~products_db["name"].isin(owned_names))]["name"].tolist())
-
-    # Deduplicate
-    owned_recs = list(set(owned_recs))
-    new_recs = list(set(new_recs))
-
-    # --- Smart AM/PM routines ---
-    routine = {"AM": [], "PM": []}
-
-    all_products = owned_recs + new_recs
-
-    for p in all_products:
-        p_lower = p.lower()
-
-        # AM routine logic
-        if ("spf" in p_lower) or ("day" in p_lower) or ("hydrating serum" in p_lower) or ("light" in p_lower):
-            routine["AM"].append(p)
-        # PM routine logic
-        elif ("night" in p_lower) or ("repair" in p_lower) or ("cream" in p_lower) or ("serum" in p_lower):
-            routine["PM"].append(p)
-
-        # Add products based on skin type/concerns
-        if skin_type == "oily" and "mattifier" in p_lower:
-            routine["AM"].append(p)
-        if skin_type == "dry" and ("rich" in p_lower or "hydrator" in p_lower):
-            routine["PM"].append(p)
-        if "anti-aging" in p_lower or "brightening" in p_lower:
-            routine["PM"].append(p)
-        if "anti-acne" in p_lower:
-            routine["AM"].append(p)
-
-    # Deduplicate routines
-    routine["AM"] = list(set(routine["AM"]))
-    routine["PM"] = list(set(routine["PM"]))
-
-    return today["skincare_recs"], owned_recs, new_recs, routine
+def group_and_sort_products(product_names, products_db):
+    """
+    Group a list of product names by their category.
+    Returns a dict: {category: [product names]}
+    """
+    grouped = {}
+    for name in product_names:
+        row = products_db[products_db["name"] == name]
+        if not row.empty:
+            cat = row.iloc[0]["category"]
+            grouped.setdefault(cat, []).append(name)
+    return grouped
